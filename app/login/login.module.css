@@ -1,0 +1,950 @@
+/* ==========================================================================
+   PortAI Auth Design System - Clean, Crisp Dark Theme (No Glow)
+   ========================================================================== */
+
+.loginPage {
+  --bg: #090d16;
+  --panel: #0f1523;
+  --panel-surface: #111827;
+  --card-border: #1e293b;
+  --card-border-hover: #334155;
+  --card-border-focus: #4f46e5;
+  
+  --ink: #f8fafc;
+  --ink-secondary: #94a3b8;
+  --muted: #64748b;
+  --line: #1e293b;
+  --soft-line: #172033;
+  
+  --brand-primary: #4f46e5;
+  --brand-hover: #4338ca;
+  --brand-blue: #2563eb;
+  --brand-emerald: #059669;
+  
+  --danger: #f87171;
+  --danger-bg: rgba(239, 68, 68, 0.1);
+  --danger-border: rgba(239, 68, 68, 0.25);
+  
+  --success: #34d399;
+  --success-bg: rgba(16, 185, 129, 0.1);
+  --success-border: rgba(16, 185, 129, 0.25);
+  
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+
+  width: 100%;
+  min-height: 100svh;
+  color: var(--ink);
+  background-color: var(--bg);
+  font-family: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overflow-x: hidden;
+  position: relative;
+}
+
+.loginPage * {
+  box-sizing: border-box;
+}
+
+.loginPage a {
+  color: inherit;
+}
+
+/* Layout Shell */
+.page {
+  min-height: 100svh;
+  display: grid;
+  padding: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.authShell {
+  width: 100%;
+  min-height: 100svh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(460px, 0.85fr);
+}
+
+/* --------------------------------------------------------------------------
+   BRAND / SHOWCASE PANEL (LEFT)
+   -------------------------------------------------------------------------- */
+.brandPanel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: clamp(2rem, 4vw, 3.5rem);
+  min-height: 100svh;
+  padding: clamp(2.5rem, 5vw, 4.5rem);
+  background: #0c111c;
+  border-right: 1px solid var(--line);
+}
+
+.brandPanel > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Wordmark & Brand Badge */
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #4f46e5;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.mark svg {
+  width: 20px;
+  height: 20px;
+}
+
+.versionBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
+  color: #cbd5e1;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Brand Copy */
+.brandCopy {
+  max-width: 600px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 1.25rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  color: #94a3b8;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.eyebrowPulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #38bdf8;
+}
+
+.brandCopy h1 {
+  margin: 0;
+  font-size: clamp(2.3rem, 4.2vw, 3.5rem);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: #ffffff;
+}
+
+.highlightText {
+  color: #60a5fa;
+}
+
+.brandCopy p {
+  margin: 1.25rem 0 0;
+  color: var(--ink-secondary);
+  font-size: clamp(0.96rem, 1.2vw, 1.08rem);
+  line-height: 1.6;
+  max-width: 500px;
+}
+
+/* --------------------------------------------------------------------------
+   INTERACTIVE SHOWCASE CARD (NO GLOW)
+   -------------------------------------------------------------------------- */
+.previewWidget {
+  width: 100%;
+  max-width: 540px;
+  background: var(--panel-surface);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 1.35rem;
+}
+
+.previewHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--soft-line);
+}
+
+.previewStatus {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.statusIndicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.previewMetrics {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.metricTag {
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
+  color: #94a3b8;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.stepPipeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.stepItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.85rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  font-size: 0.84rem;
+}
+
+.stepInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.stepIconSuccess {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  display: grid;
+  place-items: center;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.stepIconActive {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: rgba(79, 70, 229, 0.15);
+  color: #a5b4fc;
+  display: grid;
+  place-items: center;
+  font-size: 0.75rem;
+}
+
+.stepLabel {
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.stepDetail {
+  font-size: 0.76rem;
+  color: #64748b;
+}
+
+/* Score Card in preview */
+.scoreCard {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 1rem;
+  background: #090d16;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+}
+
+.scoreCircle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #ffffff;
+  font-weight: 900;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.scoreLabel {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.scoreDetails h4 {
+  margin: 0 0 0.2rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.scoreDetails p {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #94a3b8;
+  line-height: 1.4;
+}
+
+/* Social Proof Banner */
+.socialProof {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding-top: 1rem;
+}
+
+.avatarStack {
+  display: flex;
+  margin-left: 0.4rem;
+}
+
+.avatarItem {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid #0c111c;
+  margin-left: -0.5rem;
+  background: #1e293b;
+  display: grid;
+  place-items: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.socialText {
+  font-size: 0.82rem;
+  color: var(--ink-secondary);
+}
+
+.socialText strong {
+  color: #ffffff;
+}
+
+/* --------------------------------------------------------------------------
+   FORM PANEL (RIGHT)
+   -------------------------------------------------------------------------- */
+.formPanel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100svh;
+  padding: clamp(2rem, 5vw, 4.5rem);
+  background: #090d16;
+}
+
+.authCard {
+  width: 100%;
+  max-width: 450px;
+  margin: 0 auto;
+  padding: clamp(1.75rem, 3vw, 2.25rem);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  background: #0f1523;
+}
+
+/* Segmented Tab Switcher */
+.tabSwitcher {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 3px;
+  margin-bottom: 1.75rem;
+  background: #090d16;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+}
+
+.tabBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 1rem;
+  border-radius: 6px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.tabBtn:hover {
+  color: var(--ink);
+}
+
+.tabBtnActive {
+  background: #1e293b;
+  color: #ffffff;
+}
+
+.formHeader {
+  margin-bottom: 1.5rem;
+}
+
+.formHeader h2 {
+  margin: 0 0 0.4rem;
+  font-size: clamp(1.6rem, 2.5vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+}
+
+.formHeader p {
+  margin: 0;
+  color: var(--ink-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* OAuth Providers */
+.oauthGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.oauthButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: #111827;
+  color: #f1f5f9;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.oauthButton:hover:not(:disabled) {
+  background: #1e293b;
+  border-color: var(--card-border-hover);
+}
+
+.oauthButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.oauthButton svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+}
+
+/* Divider */
+.divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.35rem 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  height: 1px;
+  background: var(--line);
+}
+
+/* Form Fields */
+.loginPage form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+}
+
+.field label {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: #cbd5e1;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.inputShell {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.inputIcon {
+  position: absolute;
+  left: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 17px;
+  height: 17px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.field input[type="email"],
+.field input[type="text"],
+.field input[type="password"] {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.7rem 0.9rem 0.7rem 2.65rem;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  outline: none;
+  background: #090d16;
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.92rem;
+  transition: border-color 0.15s ease;
+}
+
+.field input::placeholder {
+  color: #475569;
+}
+
+.field input:hover {
+  border-color: var(--card-border-hover);
+}
+
+.field input:focus {
+  border-color: var(--brand-primary);
+}
+
+.passwordWrap input {
+  padding-right: 2.85rem;
+}
+
+.toggleVisibility {
+  position: absolute;
+  right: 0.4rem;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toggleVisibility:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f1f5f9;
+}
+
+.toggleVisibility svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* Password Strength Meter */
+.strengthMeter {
+  margin-top: 0.5rem;
+}
+
+.strengthBarWrapper {
+  display: flex;
+  gap: 4px;
+  height: 4px;
+  margin-bottom: 0.35rem;
+}
+
+.strengthSegment {
+  flex: 1;
+  height: 100%;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  transition: background 0.2s ease;
+}
+
+.strengthText {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.strengthText span:last-child {
+  font-weight: 700;
+}
+
+/* Row Utilities */
+.rowBetween {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.1rem 0;
+  font-size: 0.84rem;
+}
+
+.remember {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--ink-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.remember input {
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  accent-color: var(--brand-primary);
+  cursor: pointer;
+}
+
+.forgotButton {
+  border: none;
+  background: none;
+  padding: 0;
+  color: #818cf8;
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.forgotButton:hover {
+  color: #a5b4fc;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Primary Submit Button (Solid, Flat & Crisp) */
+.submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  width: 100%;
+  min-height: 46px;
+  margin-top: 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: #4f46e5;
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.submit:hover:not(:disabled) {
+  background: #4338ca;
+}
+
+.submit:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.submit svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* Spinner */
+.spinner {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Notice / Alerts */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-bottom: 1.25rem;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid var(--danger-border);
+  border-radius: 8px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.noticeSuccess {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.noticeMessages {
+  border-color: rgba(99, 102, 241, 0.25);
+  background: rgba(99, 102, 241, 0.1);
+  color: #a5b4fc;
+}
+
+/* Quick Demo Box */
+.demoBox {
+  margin-top: 1.25rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 8px;
+  background: #111827;
+  border: 1px solid var(--card-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.82rem;
+  color: var(--ink-secondary);
+}
+
+.demoBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  background: #1f2937;
+  color: #f1f5f9;
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.demoBtn:hover {
+  background: #374151;
+  color: #ffffff;
+}
+
+/* Footnote */
+.footnote {
+  margin: 1.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  text-align: center;
+}
+
+.footnote a {
+  color: #818cf8;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.footnote a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* --------------------------------------------------------------------------
+   FORGOT PASSWORD MODAL
+   -------------------------------------------------------------------------- */
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.75);
+}
+
+.modalContent {
+  position: relative;
+  width: 100%;
+  max-width: 430px;
+  background: #0f1523;
+  border-radius: 12px;
+  padding: 1.75rem;
+  border: 1px solid var(--card-border);
+}
+
+.modalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.35rem;
+}
+
+.modalTitle {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.modalDescription {
+  margin: 0 0 1.25rem;
+  font-size: 0.86rem;
+  color: var(--ink-secondary);
+  line-height: 1.5;
+}
+
+.modalCloseBtn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.modalCloseBtn:hover {
+  background: #1e293b;
+  color: #ffffff;
+}
+
+.modalActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.cancelBtn {
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-secondary);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.cancelBtn:hover {
+  background: #1e293b;
+  color: #ffffff;
+}
+
+/* Accessibility Focus States */
+.loginPage a:focus-visible,
+.loginPage button:focus-visible,
+.loginPage input:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+/* Responsive */
+@media (max-width: 980px) {
+  .authShell {
+    grid-template-columns: 1fr;
+  }
+
+  .brandPanel {
+    min-height: auto;
+    padding: 2.25rem 1.5rem;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .previewWidget {
+    display: none;
+  }
+
+  .formPanel {
+    padding: 2.25rem 1.25rem 3.5rem;
+    min-height: auto;
+  }
+
+  .authCard {
+    max-width: 480px;
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .oauthGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .rowBetween {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+}

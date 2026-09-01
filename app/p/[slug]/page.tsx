@@ -1,0 +1,270 @@
+"use client";
+
+import { use, useState } from "react";
+import Link from "next/link";
+import styles from "./portfolio.module.css";
+import { DEFAULT_PORTFOLIO, SAMPLE_CVS, PortfolioData } from "../../lib/portfolio-data";
+import { exportPortfolioZip } from "../../lib/export-code";
+
+export default function PublicPortfolioPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const resolvedParams = use(params);
+  const slug = resolvedParams.slug;
+
+  const data: PortfolioData =
+    slug === "jordan-lee" ? SAMPLE_CVS.fullstack : DEFAULT_PORTFOLIO;
+
+  const [exporting, setExporting] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function handleExportZip() {
+    setExporting(true);
+    try {
+      const blob = await exportPortfolioZip(data);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${data.slug}-portfolio-source.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Failed to export ZIP");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  function handleCopy() {
+    if (typeof window !== "undefined") {
+      navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
+  }
+
+  return (
+    <div className={styles.portfolioWrapper}>
+      {/* Top PortAI Banner */}
+      <header className={styles.topBanner}>
+        <Link href="/" className={styles.bannerBrand}>
+          <span
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: 6,
+              background: "#4f46e5",
+              display: "grid",
+              placeItems: "center",
+              fontSize: "0.75rem",
+              color: "#ffffff",
+              fontWeight: 800,
+            }}
+          >
+            P
+          </span>
+          <span>
+            Generated from {data.cvFileName || "CV"} with <strong>PortAI</strong>
+          </span>
+        </Link>
+
+        <div className={styles.bannerActions}>
+          <button
+            type="button"
+            className={styles.exportBtn}
+            onClick={handleExportZip}
+            disabled={exporting}
+          >
+            {exporting ? (
+              "Exporting…"
+            ) : (
+              <>
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2.2}>
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Export Source Code (.zip)
+              </>
+            )}
+          </button>
+
+          <Link
+            href="/dashboard"
+            style={{
+              fontSize: "0.82rem",
+              fontWeight: 600,
+              color: "#cbd5e1",
+              textDecoration: "none",
+              padding: "0.4rem 0.8rem",
+              borderRadius: 6,
+              background: "#1e293b",
+              border: "1px solid #334155",
+            }}
+          >
+            Dashboard
+          </Link>
+        </div>
+      </header>
+
+      <main className={styles.container}>
+        {/* Hero Section */}
+        <section>
+          <div className={styles.heroBadge}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981" }} />
+            {data.location} · Verified Portfolio
+          </div>
+
+          <div className={styles.heroName}>{data.fullName}</div>
+          <h1 className={styles.heroTitle}>{data.title}</h1>
+          <p className={styles.heroBio}>{data.bio}</p>
+
+          <div className={styles.socialRow}>
+            {data.github && (
+              <a href={data.github} target="_blank" rel="noreferrer" className={styles.socialPill}>
+                GitHub ↗
+              </a>
+            )}
+            {data.linkedin && (
+              <a href={data.linkedin} target="_blank" rel="noreferrer" className={styles.socialPill}>
+                LinkedIn ↗
+              </a>
+            )}
+            <a
+              href={`mailto:${data.email}`}
+              className={styles.socialPill}
+              style={{ background: "#4f46e5", border: "1px solid rgba(255, 255, 255, 0.1)", color: "#ffffff", fontWeight: 700 }}
+            >
+              Get in Touch
+            </a>
+          </div>
+
+          {/* Metrics Grid */}
+          <div className={styles.metricsGrid}>
+            {data.metrics.map((m, i) => (
+              <div key={i} className={styles.metricCard}>
+                <div className={styles.metricVal}>{m.value}</div>
+                <div className={styles.metricLbl}>{m.label}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Featured Projects */}
+        <section className={styles.section} id="projects">
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Featured Projects & Case Studies</h2>
+            <p className={styles.sectionSubtitle}>
+              Synthesized from repository analysis and CV technical highlights.
+            </p>
+          </div>
+
+          <div className={styles.projectsGrid}>
+            {data.projects.map((project) => (
+              <article key={project.id} className={styles.projectCard}>
+                <div>
+                  <h3 className={styles.projectTitle}>{project.title}</h3>
+                  <p className={styles.projectDesc}>{project.description}</p>
+                  <div className={styles.tags}>
+                    {project.tags.map((tag, idx) => (
+                      <span key={idx} className={styles.tag}>
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "0.85rem", borderTop: "1px solid var(--border)" }}>
+                  <span className={styles.impactBadge}>⚡ {project.metric}</span>
+                  <a
+                    href={project.repoUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ fontSize: "0.82rem", fontWeight: 600, color: "#60a5fa", textDecoration: "none" }}
+                  >
+                    View Code ↗
+                  </a>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        {/* Experience Timeline */}
+        <section className={styles.section} id="experience">
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Work Experience</h2>
+            <p className={styles.sectionSubtitle}>Career trajectory and technical impact milestones.</p>
+          </div>
+
+          <div className={styles.experienceList}>
+            {data.experience.map((exp) => (
+              <div key={exp.id} className={styles.experienceItem}>
+                <div className={styles.expHeader}>
+                  <h3 className={styles.expRole}>
+                    {exp.role} · <span className={styles.expCompany}>{exp.company}</span>
+                  </h3>
+                  <span className={styles.expPeriod}>
+                    {exp.period} · {exp.location}
+                  </span>
+                </div>
+                <ul className={styles.expHighlights}>
+                  {exp.highlights.map((h, i) => (
+                    <li key={i}>{h}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Skills Grid */}
+        <section className={styles.section} id="skills">
+          <div className={styles.sectionHeader}>
+            <h2 className={styles.sectionTitle}>Technical Skills & Core Tooling</h2>
+            <p className={styles.sectionSubtitle}>
+              Categorized technologies extracted from hands-on production experience.
+            </p>
+          </div>
+
+          <div className={styles.skillsGrid}>
+            {data.skills.map((skillGroup, i) => (
+              <div key={i} className={styles.skillBox}>
+                <div className={styles.skillCat}>{skillGroup.category}</div>
+                <div className={styles.skillPills}>
+                  {skillGroup.items.map((skill, idx) => (
+                    <span key={idx} className={styles.skillPill}>
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </main>
+
+      {/* Floating Action Dock */}
+      <div className={styles.floatingDock}>
+        <button type="button" className={styles.dockBtn} onClick={handleCopy}>
+          {copied ? "✓ Copied Link" : "Copy Link"}
+        </button>
+        <button
+          type="button"
+          className={`${styles.dockBtn} ${styles.dockBtnPrimary}`}
+          onClick={handleExportZip}
+          disabled={exporting}
+        >
+          {exporting ? "Exporting…" : "Export Next.js Source (.zip)"}
+        </button>
+        <Link href="/signup" className={styles.dockBtn}>
+          Build with PortAI ↗
+        </Link>
+      </div>
+    </div>
+  );
+}
