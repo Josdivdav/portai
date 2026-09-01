@@ -1,6 +1,16 @@
+'use client';
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 export default function Home() {
+  const [domain, setDomain] = useState<string>("");
+
+  useEffect(() => {
+    const d = window.location.hostname;
+    setDomain(`${d}/p/your-name`);
+  }, []);
+
   return (
     <div className="flex flex-col min-h-screen bg-[#07090e] text-slate-100 font-sans selection:bg-indigo-500 selection:text-white relative overflow-hidden">
       {/* Ambient background glows */}
@@ -38,7 +48,7 @@ export default function Home() {
           </Link>
           <Link
             href="/signup"
-            className="text-sm font-semibold bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white px-4 py-2 rounded-xl shadow-md shadow-indigo-600/30 transition-all hover:-translate-y-0.5"
+            className="text-sm font-semibold bg-indigo-600 hover:from-indigo-500 text-white px-4 py-2 rounded-xl transition-all hover:-translate-y-0.5"
           >
             Create Your Portfolio Free
           </Link>
@@ -57,13 +67,13 @@ export default function Home() {
         </h1>
 
         <p className="text-lg sm:text-xl text-slate-300 max-w-2xl mb-10 leading-relaxed">
-          Drop in your resume. PortAI automatically synthesizes high-impact case studies, provisions a hosted live link (<code className="text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded text-sm font-mono">portai.me/p/your-name</code>), and lets you download 100% of the Next.js source code.
+          Drop in your resume. PortAI automatically synthesizes high-impact case studies, provisions a hosted live link (<code className="text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded text-sm font-mono">{ domain }</code>), and lets you download 100% of the Next.js source code.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center mb-16">
           <Link
             href="/signup"
-            className="w-full sm:w-auto px-8 py-3.5 rounded-xl font-bold bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white shadow-xl shadow-indigo-600/30 hover:-translate-y-0.5 transition-all text-base"
+            className="w-full sm:w-auto px-8 py-3.5 rounded-xl font-bold bg-cyan-600 text-white hover:-translate-y-0.5 transition-all text-base"
           >
             Upload CV & Generate Portfolio ➔
           </Link>
@@ -93,7 +103,7 @@ export default function Home() {
             </div>
             <h3 className="font-bold text-white text-base mb-2">Hosted Live Link</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Instant hosted URL (<code className="text-cyan-400 font-mono">portai.me/p/name</code>) ready to send to recruiters and hiring managers.
+              Instant hosted URL (<code className="text-cyan-400 font-mono">{ domain }</code>) ready to send to recruiters and hiring managers.
             </p>
           </div>
 

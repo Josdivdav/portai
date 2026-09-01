@@ -21,7 +21,7 @@ function RegisterForm() {
   const [socialLoading, setSocialLoading] = useState<"google" | "github" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Real-time password strength calculation
+  
   const strengthInfo = useMemo(() => {
     if (!password1) return { score: 0, label: "Empty", color: "#64748b" };
     let score = 0;
