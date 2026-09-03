@@ -4,6 +4,7 @@ import { useState, useMemo, Suspense, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import styles from "../login/login.module.css";
+import { continueWithGoogle } from "../functions/register.function";
 
 function RegisterForm() {
   const router = useRouter();
@@ -101,24 +102,11 @@ function RegisterForm() {
     setSocialLoading(provider);
     setError(null);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      const providerEmail =
-        provider === "github" ? "github.dev@portai.me" : "google.user@portai.dev";
-
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: providerEmail,
-          password: "oauth_social_verified_session",
-          remember: true,
-        }),
-      });
-
-      if (res.ok) {
-        router.push(next || "/dashboard");
-      } else {
-        setError(`${provider === "github" ? "GitHub" : "Google"} authentication could not be completed.`);
+      if (provider === "google") {
+        const userCredential = await continueWithGoogle();
+        console.log(userCredential);
+      } else if (provider === "github") {
+        alert("GitHub social sign-in is not yet implemented. Please use Google or email sign-up.");
       }
     } catch {
       setError("Social authentication error. Please try again.");
