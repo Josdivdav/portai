@@ -27,15 +27,16 @@ export async function continueWithGoogle() {
       email: user.email || "",
       accessToken,
       method: "google",
+      userId: user.uid,
     });
-    return { user, accessToken };
+    return { user, res };
   } catch (error) {
     console.error("Error signing in with Google:", error);
     throw error;
   }
 }
 
-async function sendDataToServer(data: { fullName: string; email: string; accessToken?: string; method: string }) {
+async function sendDataToServer(data: { fullName: string; email: string; accessToken?: string; method: string, userId: string }) {
   try {
     const response = await fetch("/api/register", {
       method: "POST",

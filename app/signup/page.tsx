@@ -104,7 +104,6 @@ function RegisterForm() {
     try {
       if (provider === "google") {
         const userCredential = await continueWithGoogle();
-        console.log(userCredential);
       } else if (provider === "github") {
         alert("GitHub social sign-in is not yet implemented. Please use Google or email sign-up.");
       }

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { db } from "../../lib/firebase-db";
+import { getAuth } from "firebase-admin/auth";
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { fullName, email, method } = body;
+    const { fullName, email, method, userId } = body;
 
     if (!fullName || typeof fullName !== "string" || fullName.trim().length === 0) {
       return NextResponse.json(
@@ -36,10 +37,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Here, you would typically handle the registration logic, such as saving the user to a database or performing additional checks.
-
-    const userId = db.ref(`users/`).push().key;
-
-    console.log(userId)
+    
+    const verifiedToken = await getAuth().verifyIdToken(body.accessToken);
 
     const sessionPayload = {
       email,
@@ -48,7 +47,9 @@ export async function POST(request: NextRequest) {
       role: "user",
       registeredAt: new Date().toISOString(),
       userId: userId,
+      verified: verifiedToken ? true : false,
     };
+    //
 
     const response = NextResponse.json({
       success: true,
