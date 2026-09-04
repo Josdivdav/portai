@@ -26,8 +26,8 @@ export async function continueWithGoogle() {
       fullName: user.displayName || "",
       email: user.email || "",
       accessToken,
+      method: "google",
     });
-    console.log("Data sent to server:", res);
     return { user, accessToken };
   } catch (error) {
     console.error("Error signing in with Google:", error);
@@ -35,7 +35,7 @@ export async function continueWithGoogle() {
   }
 }
 
-async function sendDataToServer(data: { fullName: string; email: string; accessToken?: string }) {
+async function sendDataToServer(data: { fullName: string; email: string; accessToken?: string; method: string }) {
   try {
     const response = await fetch("/api/register", {
       method: "POST",

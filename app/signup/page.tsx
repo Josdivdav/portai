@@ -108,8 +108,9 @@ function RegisterForm() {
       } else if (provider === "github") {
         alert("GitHub social sign-in is not yet implemented. Please use Google or email sign-up.");
       }
-    } catch {
+    } catch (error : any) {
       setError("Social authentication error. Please try again.");
+      console.log(error)
     } finally {
       setSocialLoading(null);
     }

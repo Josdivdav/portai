@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { db } from "../../lib/firebase-db";
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { fullName, email, password } = body;
+    const { fullName, email, method } = body;
 
     if (!fullName || typeof fullName !== "string" || fullName.trim().length === 0) {
       return NextResponse.json(
@@ -19,12 +21,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!password || typeof password !== "string" || password.length < 8) {
+    if (!method || typeof method !== "string") {
       return NextResponse.json(
-        { error: "Password must be at least 8 characters long." },
+        { error: "Please provide a valid sign-up method." },
         { status: 400 }
       );
     }
+
+    if(body.accessToken && typeof body.accessToken !== "string") {
+      return NextResponse.json(
+        { error: "Invalid access token." },
+        { status: 400 }
+      );
+    }
+
+    // Here, you would typically handle the registration logic, such as saving the user to a database or performing additional checks.
+
+    const userId = db.ref(`users/`).push().key;
+
+    console.log(userId)
 
     const sessionPayload = {
       email,
@@ -32,6 +47,7 @@ export async function POST(request: NextRequest) {
       authenticated: true,
       role: "user",
       registeredAt: new Date().toISOString(),
+      userId: userId,
     };
 
     const response = NextResponse.json({
