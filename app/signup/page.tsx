@@ -4,7 +4,12 @@ import { useState, useMemo, Suspense, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import styles from "../login/login.module.css";
-import { continueWithGoogle } from "../functions/register.function";
+import {
+  registerUser,
+  continueWithGoogle,
+  continueWithGithub,
+  formatAuthError,
+} from "../functions/register.function";
 
 function RegisterForm() {
   const router = useRouter();
@@ -21,8 +26,8 @@ function RegisterForm() {
   const [submitting, setSubmitting] = useState(false);
   const [socialLoading, setSocialLoading] = useState<"google" | "github" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  
   const strengthInfo = useMemo(() => {
     if (!password1) return { score: 0, label: "Empty", color: "#64748b" };
     let score = 0;
@@ -48,10 +53,11 @@ function RegisterForm() {
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    setSuccessMessage(null);
 
     const trimmedName = fullName.trim();
-    if (!trimmedName) {
-      setError("Please enter your full name.");
+    if (!trimmedName || trimmedName.length < 2) {
+      setError("Please enter your full name (at least 2 characters).");
       return;
     }
 
@@ -77,22 +83,20 @@ function RegisterForm() {
     setSubmitting(true);
 
     try {
-      const res = await fetch("/api/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName: trimmedName, email: trimmedEmail, password: password1, next }),
+      await registerUser({
+        fullName: trimmedName,
+        email: trimmedEmail,
+        password: password1,
       });
 
-      const data = await res.json().catch(() => ({}));
+      setSuccessMessage("Account created successfully! Launching your workspace…");
 
-      if (!res.ok) {
-        setError(data.error || "Unable to create account. Please check your information.");
-        return;
-      }
-
-      router.push(`/login?registered=1${next ? `&next=${encodeURIComponent(next)}` : ""}`);
-    } catch {
-      setError("Connection error. Please try again in a few moments.");
+      setTimeout(() => {
+        router.push(next || "/dashboard");
+        router.refresh();
+      }, 750);
+    } catch (err: unknown) {
+      setError(formatAuthError(err));
     } finally {
       setSubmitting(false);
     }
@@ -101,15 +105,23 @@ function RegisterForm() {
   async function handleSocialSignIn(provider: "google" | "github") {
     setSocialLoading(provider);
     setError(null);
+    setSuccessMessage(null);
+
     try {
       if (provider === "google") {
-        const userCredential = await continueWithGoogle();
+        await continueWithGoogle();
+        setSuccessMessage("Google account connected! Launching workspace…");
       } else if (provider === "github") {
-        alert("GitHub social sign-in is not yet implemented. Please use Google or email sign-up.");
+        await continueWithGithub();
+        setSuccessMessage("GitHub account connected! Launching workspace…");
       }
-    } catch (error : any) {
-      setError("Social authentication error. Please try again.");
-      console.log(error)
+
+      setTimeout(() => {
+        router.push(next || "/dashboard");
+        router.refresh();
+      }, 650);
+    } catch (err: unknown) {
+      setError(formatAuthError(err));
     } finally {
       setSocialLoading(null);
     }
@@ -290,6 +302,15 @@ function RegisterForm() {
               </div>
 
               <div className={styles.divider}>or with email</div>
+
+              {successMessage && (
+                <div className={`${styles.notice} ${styles.noticeSuccess}`} role="status">
+                  <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18" style={{ flexShrink: 0, marginTop: 1 }}>
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+                  </svg>
+                  <span>{successMessage}</span>
+                </div>
+              )}
 
               {error && (
                 <div className={styles.notice} role="alert">
@@ -519,7 +540,7 @@ function RegisterForm() {
               </form>
 
               <p className={styles.footnote}>
-                Already have an account? <Link href="/login">Sign in</Link> · <Link href="/demo">View demo</Link>
+                Already have an account? <Link href="/login">Sign in</Link> · <Link href="https://divinie.web.app">View demo</Link>
               </p>
             </div>
           </section>

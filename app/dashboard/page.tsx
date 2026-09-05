@@ -1,20 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./dashboard.module.css";
-import { DEFAULT_PORTFOLIO, SAMPLE_CVS, PortfolioData, ProjectItem } from "../lib/portfolio-data";
+import { DEFAULT_PORTFOLIO, SAMPLE_CVS, PortfolioData, ProjectItem, ExperienceItem } from "../lib/portfolio-data";
 import { exportPortfolioZip, generatePortfolioFiles } from "../lib/export-code";
+
+interface UserSession {
+  userId: string;
+  email: string;
+  name: string;
+  role?: string;
+  photoURL?: string | null;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
+
+  // Authentication & session state
+  const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   // Core portfolio state from CV
   const [portfolio, setPortfolio] = useState<PortfolioData>(DEFAULT_PORTFOLIO);
   const [activeTab, setActiveTab] = useState<"projects" | "experience" | "bio" | "theme" | "analytics">("projects");
 
-  // Navigation & session state
+  // Navigation & action states
   const [loggingOut, setLoggingOut] = useState(false);
   const [deploying, setDeploying] = useState(false);
   const [exportingZip, setExportingZip] = useState(false);
@@ -28,7 +40,7 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
 
-  // Modals state
+  // Project Modals state
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [newProject, setNewProject] = useState({
     title: "",
@@ -36,6 +48,16 @@ export default function DashboardPage() {
     tags: "",
     metric: "",
     category: "ai" as "ai" | "infra" | "frontend" | "mobile",
+  });
+
+  // Experience Modal state
+  const [addExpModalOpen, setAddExpModalOpen] = useState(false);
+  const [newExp, setNewExp] = useState({
+    role: "",
+    company: "",
+    period: "",
+    location: "",
+    highlights: "",
   });
 
   const [aiModalOpen, setAiModalOpen] = useState(false);
@@ -52,6 +74,63 @@ export default function DashboardPage() {
     setTimeout(() => setToastMessage(null), 3500);
   }
 
+  // Verify authentication on mount & load saved portfolio
+  useEffect(() => {
+    let isMounted = true;
+
+    async function initDashboard() {
+      try {
+        const sessionRes = await fetch("/api/auth/me");
+        const sessionData = await sessionRes.json().catch(() => ({}));
+
+        if (!sessionData.authenticated || !sessionData.user) {
+          router.push("/login?next=/dashboard");
+          return;
+        }
+
+        if (isMounted) {
+          setCurrentUser(sessionData.user);
+        }
+
+        // Fetch user's saved portfolio from database
+        const portRes = await fetch("/api/portfolio");
+        if (portRes.ok) {
+          const portData = await portRes.json();
+          if (portData.portfolio && isMounted) {
+            setPortfolio(portData.portfolio);
+          }
+        }
+      } catch (err) {
+        console.error("Error initializing dashboard session:", err);
+      } finally {
+        if (isMounted) {
+          setAuthLoading(false);
+        }
+      }
+    }
+
+    initDashboard();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
+
+  // Persist portfolio changes to database
+  async function persistPortfolio(updated: PortfolioData) {
+    try {
+      const res = await fetch("/api/portfolio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
+      });
+      return res.ok;
+    } catch (err) {
+      console.warn("Notice: autosave to database failed:", err);
+      return false;
+    }
+  }
+
   async function handleLogout() {
     setLoggingOut(true);
     try {
@@ -65,14 +144,32 @@ export default function DashboardPage() {
 
   async function handleDeploy() {
     setDeploying(true);
-    await new Promise((resolve) => setTimeout(resolve, 1100));
-    setDeploying(false);
-    showToast(`✨ Portfolio deployed live to portai.me/p/${portfolio.slug} in 1.1s!`);
+    try {
+      const res = await fetch("/api/portfolio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(portfolio),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.portfolio) {
+        setPortfolio(data.portfolio);
+        showToast(`✨ Portfolio deployed live to /p/${data.portfolio.slug}!`);
+      } else {
+        showToast(data.error || "Failed to deploy portfolio.");
+      }
+    } catch {
+      showToast("Network error while deploying portfolio.");
+    } finally {
+      setDeploying(false);
+    }
   }
 
   function handleCopyLink() {
-    const liveUrl = `${window.location.origin}/p/${portfolio.slug}`;
-    navigator.clipboard.writeText(liveUrl);
+    const origin = typeof window !== "undefined" ? window.location.origin : "https://portai.me";
+    const liveUrl = `${origin}/p/${portfolio.slug}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(liveUrl);
+    }
     showToast(`📋 Copied live portfolio link: ${liveUrl}`);
   }
 
@@ -93,24 +190,39 @@ export default function DashboardPage() {
     setParseStage("4/4: Deploying live portfolio link…");
     await new Promise((r) => setTimeout(r, 500));
 
-    setPortfolio((prev) => ({
-      ...prev,
+    let parsedName = portfolio.fullName;
+    if (file && file.name) {
+      const cleanBase = file.name.replace(/\.[^/.]+$/, "").replace(/[-_](cv|resume)/i, "");
+      if (cleanBase && !cleanBase.toLowerCase().includes("resume") && !cleanBase.toLowerCase().includes("cv")) {
+        const parts = cleanBase.split(/[-_\s]+/).map((p) => p.charAt(0).toUpperCase() + p.slice(1));
+        if (parts.length >= 2) {
+          parsedName = parts.join(" ");
+        }
+      }
+    }
+
+    const updated: PortfolioData = {
+      ...portfolio,
+      fullName: parsedName,
       cvFileName: fileName,
       lastParsedAt: "Just now",
-    }));
+    };
 
+    setPortfolio(updated);
     setIsParsingCv(false);
-    showToast(`✨ Successfully parsed "${fileName}" and generated live portfolio!`);
+    showToast(`✨ Successfully parsed "${fileName}" and updated live portfolio!`);
+    await persistPortfolio(updated);
   }
 
-  function loadSamplePreset(presetKey: "ai_staff" | "fullstack") {
+  async function loadSamplePreset(presetKey: "ai_staff" | "fullstack") {
     setIsParsingCv(true);
     setParseStage("Loading sample CV profile and synthesizing portfolio…");
-    setTimeout(() => {
+    setTimeout(async () => {
       const selected = SAMPLE_CVS[presetKey] || DEFAULT_PORTFOLIO;
       setPortfolio(selected);
       setIsParsingCv(false);
       showToast(`Loaded ${selected.fullName}'s CV portfolio preset`);
+      await persistPortfolio(selected);
     }, 700);
   }
 
@@ -143,15 +255,27 @@ export default function DashboardPage() {
     setCodeModalOpen(true);
   }
 
-  function toggleLive(id: string) {
-    setPortfolio((prev) => ({
-      ...prev,
-      projects: prev.projects.map((p) => (p.id === id ? { ...p, isLive: !p.isLive } : p)),
-    }));
+  async function toggleLive(id: string) {
+    const updatedProjects = portfolio.projects.map((p) =>
+      p.id === id ? { ...p, isLive: !p.isLive } : p
+    );
+    const updated = { ...portfolio, projects: updatedProjects };
+    setPortfolio(updated);
     showToast("Updated project visibility");
+    await persistPortfolio(updated);
   }
 
-  function handleAddProjectSubmit(e: React.FormEvent) {
+  async function handleDeleteProject(id: string) {
+    const updated = {
+      ...portfolio,
+      projects: portfolio.projects.filter((p) => p.id !== id),
+    };
+    setPortfolio(updated);
+    showToast("Removed project from portfolio");
+    await persistPortfolio(updated);
+  }
+
+  async function handleAddProjectSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!newProject.title.trim()) return;
 
@@ -160,22 +284,69 @@ export default function DashboardPage() {
       title: newProject.title.trim(),
       description: newProject.description.trim() || "AI-generated case study and technical breakdown.",
       tags: newProject.tags
-        ? newProject.tags.split(",").map((t) => t.trim())
+        ? newProject.tags.split(",").map((t) => t.trim()).filter(Boolean)
         : ["TypeScript", "Next.js"],
       metric: newProject.metric.trim() || "High Performance & Scalable",
       isLive: true,
-      repoUrl: "https://github.com/alexrivera",
+      repoUrl: "https://github.com",
       category: newProject.category,
     };
 
-    setPortfolio((prev) => ({
-      ...prev,
-      projects: [created, ...prev.projects],
-    }));
+    const updated = {
+      ...portfolio,
+      projects: [created, ...portfolio.projects],
+    };
 
+    setPortfolio(updated);
     setAddModalOpen(false);
     setNewProject({ title: "", description: "", tags: "", metric: "", category: "ai" });
     showToast(`Added "${created.title}" to portfolio`);
+    await persistPortfolio(updated);
+  }
+
+  async function handleAddExpSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newExp.role.trim() || !newExp.company.trim()) return;
+
+    const created: ExperienceItem = {
+      id: `exp-${Date.now()}`,
+      role: newExp.role.trim(),
+      company: newExp.company.trim(),
+      period: newExp.period.trim() || "Present",
+      location: newExp.location.trim() || "Remote",
+      highlights: newExp.highlights
+        ? newExp.highlights.split("\n").map((h) => h.trim()).filter(Boolean)
+        : ["Delivered key architectural improvements and scaled core platform metrics."],
+    };
+
+    const updated = {
+      ...portfolio,
+      experience: [created, ...portfolio.experience],
+    };
+
+    setPortfolio(updated);
+    setAddExpModalOpen(false);
+    setNewExp({ role: "", company: "", period: "", location: "", highlights: "" });
+    showToast(`Added ${created.role} at ${created.company}`);
+    await persistPortfolio(updated);
+  }
+
+  async function handleSaveBio() {
+    setDeploying(true);
+    const success = await persistPortfolio(portfolio);
+    setDeploying(false);
+    if (success) {
+      showToast("✨ Saved and published updated bio to live portfolio!");
+    } else {
+      showToast("Bio updated in preview.");
+    }
+  }
+
+  async function handleThemeChange(theme: "obsidian" | "violet" | "emerald" | "minimal") {
+    const updated = { ...portfolio, theme };
+    setPortfolio(updated);
+    showToast(`Switched theme to ${theme === "obsidian" ? "Obsidian Luxe" : theme === "violet" ? "Midnight Violet" : "Cyber Emerald"}`);
+    await persistPortfolio(updated);
   }
 
   function openAiEnrich(project: ProjectItem) {
@@ -183,6 +354,31 @@ export default function DashboardPage() {
     setAiModalOpen(true);
     setAiLoading(true);
     setTimeout(() => setAiLoading(false), 900);
+  }
+
+  async function applyAiEnhancements() {
+    if (!enrichingProject) return;
+
+    const enhancedMetric = "Zero-copy memory pipelines in Rust (4.2x latency reduction)";
+    const enhancedDesc = `${enrichingProject.description.trim()} Optimized with zero-copy memory pipelines and high-throughput multi-region edge failover with 99.999% uptime.`;
+
+    const updatedProjects = portfolio.projects.map((p) => {
+      if (p.id === enrichingProject.id) {
+        return {
+          ...p,
+          metric: enhancedMetric,
+          description: enhancedDesc,
+          tags: Array.from(new Set([...p.tags, "High-Throughput", "Distributed", "Rust"])),
+        };
+      }
+      return p;
+    });
+
+    const updated = { ...portfolio, projects: updatedProjects };
+    setPortfolio(updated);
+    setAiModalOpen(false);
+    showToast(`✨ Enriched case study applied to "${enrichingProject.title}"`);
+    await persistPortfolio(updated);
   }
 
   const filteredProjects = portfolio.projects.filter((p) => {
@@ -195,6 +391,17 @@ export default function DashboardPage() {
 
     return matchesSearch && matchesCategory;
   });
+
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: "100svh", display: "grid", placeItems: "center", background: "#07090e" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+          <div style={{ width: 34, height: 34, borderRadius: "50%", border: "3px solid #6366f1", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />
+          <span style={{ color: "#94a3b8", fontSize: "0.88rem", fontWeight: 500 }}>Connecting to your workspace…</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.dashboardPage}>
@@ -225,7 +432,9 @@ export default function DashboardPage() {
               <span className={styles.pulseDot} />
               Live Site
             </span>
-            <span>portai.me/p/{portfolio.slug}</span>
+            <Link href={`/p/${portfolio.slug}`} target="_blank" style={{ color: "inherit", textDecoration: "none" }}>
+              /p/{portfolio.slug} ↗
+            </Link>
           </div>
         </div>
 
@@ -303,7 +512,17 @@ export default function DashboardPage() {
           </button>
 
           <div className={styles.userMenu}>
-            <div className={styles.avatar}>{portfolio.fullName.charAt(0)}</div>
+            <div className={styles.avatar} title={currentUser?.email || portfolio.email}>
+              {currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : portfolio.fullName.charAt(0).toUpperCase()}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", minWidth: 0, textAlign: "left" }}>
+              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#f8fafc", lineHeight: 1.1 }}>
+                {currentUser?.name || portfolio.fullName}
+              </span>
+              <span style={{ fontSize: "0.7rem", color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 140 }}>
+                {currentUser?.email || portfolio.email}
+              </span>
+            </div>
             <button
               type="button"
               className={styles.logoutBtn}
@@ -337,7 +556,7 @@ export default function DashboardPage() {
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
                 <span style={{ color: "#34d399", fontSize: "0.9rem" }}>🔗</span>
                 <span className={styles.liveUrlText}>
-                  https://portai.me/p/{portfolio.slug}
+                  {typeof window !== "undefined" ? window.location.origin : "https://portai.me"}/p/{portfolio.slug}
                 </span>
               </div>
               <div className={styles.linkActions}>
@@ -709,7 +928,7 @@ export default function DashboardPage() {
               <button
                 type="button"
                 className={styles.secondaryBtn}
-                onClick={() => showToast("Added experience slot")}
+                onClick={() => setAddExpModalOpen(true)}
               >
                 + Add Experience
               </button>
@@ -766,7 +985,7 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   className={styles.primaryBtn}
-                  onClick={() => showToast("Saved and published updated bio to live portfolio")}
+                  onClick={handleSaveBio}
                 >
                   Save & Publish Bio
                 </button>
@@ -782,10 +1001,7 @@ export default function DashboardPage() {
             <div className={styles.themeGrid}>
               <div
                 className={`${styles.themeCard} ${portfolio.theme === "obsidian" ? styles.themeCardActive : ""}`}
-                onClick={() => {
-                  setPortfolio({ ...portfolio, theme: "obsidian" });
-                  showToast("Switched theme to Obsidian Luxe");
-                }}
+                onClick={() => handleThemeChange("obsidian")}
               >
                 <div className={styles.themePreviewBox} style={{ background: "linear-gradient(135deg, #07090e, #111827)", color: "#818cf8" }}>
                   Obsidian Luxe (Active)
@@ -796,10 +1012,7 @@ export default function DashboardPage() {
 
               <div
                 className={`${styles.themeCard} ${portfolio.theme === "violet" ? styles.themeCardActive : ""}`}
-                onClick={() => {
-                  setPortfolio({ ...portfolio, theme: "violet" });
-                  showToast("Switched theme to Midnight Violet");
-                }}
+                onClick={() => handleThemeChange("violet")}
               >
                 <div className={styles.themePreviewBox} style={{ background: "linear-gradient(135deg, #1e1b4b, #31104b)", color: "#c084fc" }}>
                   Midnight Violet
@@ -810,10 +1023,7 @@ export default function DashboardPage() {
 
               <div
                 className={`${styles.themeCard} ${portfolio.theme === "emerald" ? styles.themeCardActive : ""}`}
-                onClick={() => {
-                  setPortfolio({ ...portfolio, theme: "emerald" });
-                  showToast("Switched theme to Cyber Emerald");
-                }}
+                onClick={() => handleThemeChange("emerald")}
               >
                 <div className={styles.themePreviewBox} style={{ background: "linear-gradient(135deg, #022c22, #064e3b)", color: "#34d399" }}>
                   Cyber Emerald
@@ -1077,6 +1287,108 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* ADD EXPERIENCE MODAL */}
+      {addExpModalOpen && (
+        <div
+          className={styles.modalBackdrop}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setAddExpModalOpen(false);
+          }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className={styles.modalContent}>
+            <div className={styles.modalHeader}>
+              <h3>Add Career Milestone</h3>
+              <button
+                type="button"
+                className={styles.modalCloseBtn}
+                onClick={() => setAddExpModalOpen(false)}
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleAddExpSubmit} className={styles.modalForm}>
+              <div className={styles.fieldGroup}>
+                <label>Job Title / Role *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Senior Distributed Systems Engineer"
+                  className={styles.modalInput}
+                  value={newExp.role}
+                  onChange={(e) => setNewExp({ ...newExp, role: e.target.value })}
+                />
+              </div>
+
+              <div className={styles.fieldGroup}>
+                <label>Company / Organization *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Stripe, Vercel, or Startup"
+                  className={styles.modalInput}
+                  value={newExp.company}
+                  onChange={(e) => setNewExp({ ...newExp, company: e.target.value })}
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                <div className={styles.fieldGroup}>
+                  <label>Time Period</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 2023 — Present"
+                    className={styles.modalInput}
+                    value={newExp.period}
+                    onChange={(e) => setNewExp({ ...newExp, period: e.target.value })}
+                  />
+                </div>
+
+                <div className={styles.fieldGroup}>
+                  <label>Location</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. San Francisco / Remote"
+                    className={styles.modalInput}
+                    value={newExp.location}
+                    onChange={(e) => setNewExp({ ...newExp, location: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className={styles.fieldGroup}>
+                <label>Key Accomplishments (1 bullet per line)</label>
+                <textarea
+                  rows={3}
+                  placeholder="• Scaled streaming API throughput by 300%&#10;• Mentored 6 engineers across infrastructure team"
+                  className={styles.modalInput}
+                  value={newExp.highlights}
+                  onChange={(e) => setNewExp({ ...newExp, highlights: e.target.value })}
+                />
+              </div>
+
+              <div className={styles.modalActions}>
+                <button
+                  type="button"
+                  className={styles.secondaryBtn}
+                  onClick={() => setAddExpModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className={styles.primaryBtn}>
+                  Save Experience
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* AI ENRICH CASE STUDY MODAL */}
       {aiModalOpen && enrichingProject && (
         <div
@@ -1154,10 +1466,7 @@ export default function DashboardPage() {
                   <button
                     type="button"
                     className={styles.primaryBtn}
-                    onClick={() => {
-                      setAiModalOpen(false);
-                      showToast(`✨ Enriched case study applied to "${enrichingProject.title}"`);
-                    }}
+                    onClick={applyAiEnhancements}
                   >
                     Apply Enhancements
                   </button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
 import Link from "next/link";
 import styles from "./portfolio.module.css";
 import { DEFAULT_PORTFOLIO, SAMPLE_CVS, PortfolioData } from "../../lib/portfolio-data";
@@ -14,8 +14,31 @@ export default function PublicPortfolioPage({
   const resolvedParams = use(params);
   const slug = resolvedParams.slug;
 
-  const data: PortfolioData =
-    slug === "jordan-lee" ? SAMPLE_CVS.fullstack : DEFAULT_PORTFOLIO;
+  const [data, setData] = useState<PortfolioData>(() => {
+    if (slug === "jordan-lee") return SAMPLE_CVS.fullstack;
+    return DEFAULT_PORTFOLIO;
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    async function loadPortfolio() {
+      try {
+        const res = await fetch(`/api/portfolio?slug=${encodeURIComponent(slug)}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.portfolio && isMounted) {
+            setData(json.portfolio);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not load published portfolio:", err);
+      }
+    }
+    loadPortfolio();
+    return () => {
+      isMounted = false;
+    };
+  }, [slug]);
 
   const [exporting, setExporting] = useState(false);
   const [copied, setCopied] = useState(false);

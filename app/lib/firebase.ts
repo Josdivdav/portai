@@ -1,5 +1,4 @@
-import { initializeApp } from "firebase/app";
-
+import { initializeApp, getApps, getApp } from "firebase/app";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBtaCMH97NYXFuUMd5OjGjEEs7DhLOlVek",
@@ -11,5 +10,4 @@ const firebaseConfig = {
   appId: "1:538113036385:web:c7ec50981d28dc2eea1a20"
 };
 
-
-export const app = initializeApp(firebaseConfig);
+export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
