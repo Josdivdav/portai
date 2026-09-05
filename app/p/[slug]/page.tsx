@@ -55,6 +55,7 @@ export default function PublicPortfolioPage({
   const [copied, setCopied] = useState(false);
 
   async function handleExportZip() {
+    if (!data) return;
     setExporting(true);
     try {
       const blob = await exportPortfolioZip(data);
