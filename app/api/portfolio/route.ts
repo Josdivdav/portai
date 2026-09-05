@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "../../lib/firebase-db";
-import { DEFAULT_PORTFOLIO, type PortfolioData } from "../../lib/portfolio-data";
+import { DEFAULT_PORTFOLIO, createEmptyPortfolio, type PortfolioData } from "../../lib/portfolio-data";
 
 export async function GET(request: NextRequest) {
   try {
@@ -53,29 +53,29 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
           success: true,
           portfolio: snapshot.val(),
+          hasSavedData: true,
         });
       }
     } catch (dbErr) {
       console.warn("Could not read user portfolio from DB:", dbErr);
     }
 
-    // Return customized default portfolio if none saved yet
-    const safeSlug = (session.name || "portfolio")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "");
+    // If demo account, return sample portfolio
+    if (session.role === "demo" || session.email === "demo@portai.com") {
+      return NextResponse.json({
+        success: true,
+        portfolio: DEFAULT_PORTFOLIO,
+        hasSavedData: true,
+      });
+    }
 
-    const personalizedDefault: PortfolioData = {
-      ...DEFAULT_PORTFOLIO,
-      fullName: session.name || DEFAULT_PORTFOLIO.fullName,
-      email: session.email || DEFAULT_PORTFOLIO.email,
-      slug: safeSlug || DEFAULT_PORTFOLIO.slug,
-    };
+    // For newly registered users with no saved portfolio yet: return clean empty portfolio
+    const emptyPortfolio = createEmptyPortfolio(session.name, session.email);
 
     return NextResponse.json({
       success: true,
-      portfolio: personalizedDefault,
-      isNew: true,
+      portfolio: emptyPortfolio,
+      hasSavedData: false,
     });
   } catch (error) {
     console.error("Error in GET /api/portfolio:", error);

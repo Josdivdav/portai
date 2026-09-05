@@ -4,8 +4,18 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./dashboard.module.css";
-import { DEFAULT_PORTFOLIO, SAMPLE_CVS, PortfolioData, ProjectItem, ExperienceItem } from "../lib/portfolio-data";
+import {
+  DEFAULT_PORTFOLIO,
+  SAMPLE_CVS,
+  createEmptyPortfolio,
+  parseCvToPortfolio,
+  PortfolioData,
+  ProjectItem,
+  ExperienceItem,
+} from "../lib/portfolio-data";
 import { exportPortfolioZip, generatePortfolioFiles } from "../lib/export-code";
+import { getAuth, signOut } from "firebase/auth";
+import { app } from "../lib/firebase";
 
 interface UserSession {
   userId: string;
@@ -23,7 +33,8 @@ export default function DashboardPage() {
   const [authLoading, setAuthLoading] = useState(true);
 
   // Core portfolio state from CV
-  const [portfolio, setPortfolio] = useState<PortfolioData>(DEFAULT_PORTFOLIO);
+  const [portfolio, setPortfolio] = useState<PortfolioData>(() => createEmptyPortfolio());
+  const [hasLiveSite, setHasLiveSite] = useState(false);
   const [activeTab, setActiveTab] = useState<"projects" | "experience" | "bio" | "theme" | "analytics">("projects");
 
   // Navigation & action states
@@ -98,6 +109,8 @@ export default function DashboardPage() {
           const portData = await portRes.json();
           if (portData.portfolio && isMounted) {
             setPortfolio(portData.portfolio);
+            const live = Boolean(portData.hasSavedData && portData.portfolio.cvFileName);
+            setHasLiveSite(live);
           }
         }
       } catch (err) {
@@ -134,6 +147,12 @@ export default function DashboardPage() {
   async function handleLogout() {
     setLoggingOut(true);
     try {
+      try {
+        const auth = getAuth(app);
+        await signOut(auth);
+      } catch (clientSignOutErr) {
+        console.warn("Client auth signOut notice:", clientSignOutErr);
+      }
       await fetch("/api/auth/logout", { method: "POST" });
       router.push("/login");
       router.refresh();
@@ -153,6 +172,7 @@ export default function DashboardPage() {
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.portfolio) {
         setPortfolio(data.portfolio);
+        setHasLiveSite(true);
         showToast(`✨ Portfolio deployed live to /p/${data.portfolio.slug}!`);
       } else {
         showToast(data.error || "Failed to deploy portfolio.");
@@ -173,7 +193,7 @@ export default function DashboardPage() {
     showToast(`📋 Copied live portfolio link: ${liveUrl}`);
   }
 
-  // Handle CV Upload & AI parsing simulation
+  // Handle CV Upload & AI parsing
   async function handleCvUpload(file?: File) {
     setIsParsingCv(true);
     const fileName = file ? file.name : "Custom_Uploaded_Resume.pdf";
@@ -190,28 +210,31 @@ export default function DashboardPage() {
     setParseStage("4/4: Deploying live portfolio link…");
     await new Promise((r) => setTimeout(r, 500));
 
-    let parsedName = portfolio.fullName;
-    if (file && file.name) {
-      const cleanBase = file.name.replace(/\.[^/.]+$/, "").replace(/[-_](cv|resume)/i, "");
-      if (cleanBase && !cleanBase.toLowerCase().includes("resume") && !cleanBase.toLowerCase().includes("cv")) {
-        const parts = cleanBase.split(/[-_\s]+/).map((p) => p.charAt(0).toUpperCase() + p.slice(1));
-        if (parts.length >= 2) {
-          parsedName = parts.join(" ");
-        }
-      }
+    const parsed = parseCvToPortfolio(
+      fileName,
+      currentUser?.name || portfolio.fullName,
+      currentUser?.email || portfolio.email
+    );
+
+    // If user already created projects or experiences, preserve them
+    if (portfolio.projects.length > 0) {
+      parsed.projects = [
+        ...portfolio.projects,
+        ...parsed.projects.filter((p) => !portfolio.projects.some((ep) => ep.title === p.title)),
+      ];
+    }
+    if (portfolio.experience.length > 0) {
+      parsed.experience = [
+        ...portfolio.experience,
+        ...parsed.experience.filter((e) => !portfolio.experience.some((ee) => ee.company === e.company)),
+      ];
     }
 
-    const updated: PortfolioData = {
-      ...portfolio,
-      fullName: parsedName,
-      cvFileName: fileName,
-      lastParsedAt: "Just now",
-    };
-
-    setPortfolio(updated);
+    setPortfolio(parsed);
+    setHasLiveSite(true);
     setIsParsingCv(false);
-    showToast(`✨ Successfully parsed "${fileName}" and updated live portfolio!`);
-    await persistPortfolio(updated);
+    showToast(`✨ Successfully parsed "${fileName}" and generated live portfolio!`);
+    await persistPortfolio(parsed);
   }
 
   async function loadSamplePreset(presetKey: "ai_staff" | "fullstack") {
@@ -220,6 +243,7 @@ export default function DashboardPage() {
     setTimeout(async () => {
       const selected = SAMPLE_CVS[presetKey] || DEFAULT_PORTFOLIO;
       setPortfolio(selected);
+      setHasLiveSite(true);
       setIsParsingCv(false);
       showToast(`Loaded ${selected.fullName}'s CV portfolio preset`);
       await persistPortfolio(selected);
@@ -392,6 +416,10 @@ export default function DashboardPage() {
     return matchesSearch && matchesCategory;
   });
 
+  const hasData = Boolean(
+    portfolio.cvFileName || portfolio.projects.length > 0 || portfolio.experience.length > 0
+  );
+
   if (authLoading) {
     return (
       <div style={{ minHeight: "100svh", display: "grid", placeItems: "center", background: "#07090e" }}>
@@ -428,50 +456,64 @@ export default function DashboardPage() {
           </Link>
 
           <div className={styles.siteBreadcrumb}>
-            <span className={styles.liveBadge}>
-              <span className={styles.pulseDot} />
-              Live Site
-            </span>
-            <Link href={`/p/${portfolio.slug}`} target="_blank" style={{ color: "inherit", textDecoration: "none" }}>
-              /p/{portfolio.slug} ↗
-            </Link>
+            {hasLiveSite ? (
+              <>
+                <span className={styles.liveBadge}>
+                  <span className={styles.pulseDot} />
+                  Live Site
+                </span>
+                <Link href={`/p/${portfolio.slug}`} target="_blank" style={{ color: "inherit", textDecoration: "none" }}>
+                  /p/{portfolio.slug} ↗
+                </Link>
+              </>
+            ) : (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", padding: "0.2rem 0.55rem", borderRadius: 999, background: "rgba(148,163,184,0.12)", color: "#94a3b8", fontSize: "0.72rem", fontWeight: 700 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#64748b" }} />
+                Draft · No Live Site Yet
+              </span>
+            )}
           </div>
         </div>
 
         <div className={styles.navRight}>
-          <button
-            type="button"
-            className={styles.secondaryBtn}
-            onClick={handleCopyLink}
-            title="Copy Public Portfolio Link"
-          >
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth={2}>
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-            Copy Link
-          </button>
+          {hasLiveSite && (
+            <>
+              <button
+                type="button"
+                className={styles.secondaryBtn}
+                onClick={handleCopyLink}
+                title="Copy Public Portfolio Link"
+              >
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                Copy Link
+              </button>
 
-          <Link
-            href={`/p/${portfolio.slug}`}
-            className={styles.secondaryBtn}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-              <polyline points="15 3 21 3 21 9"></polyline>
-              <line x1="10" y1="14" x2="21" y2="3"></line>
-            </svg>
-            Visit Live Site ↗
-          </Link>
+              <Link
+                href={`/p/${portfolio.slug}`}
+                className={styles.secondaryBtn}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                  <polyline points="15 3 21 3 21 9"></polyline>
+                  <line x1="10" y1="14" x2="21" y2="3"></line>
+                </svg>
+                Visit Live Site ↗
+              </Link>
+            </>
+          )}
 
           <button
             type="button"
             className={styles.exportBtn}
             onClick={handleExportZip}
-            disabled={exportingZip}
-            title="Export Next.js 16 + Tailwind source code as ZIP"
+            disabled={exportingZip || !hasData}
+            title={hasData ? "Export Next.js 16 + Tailwind source code as ZIP" : "Upload CV to export source code"}
+            style={{ opacity: hasData ? 1 : 0.6 }}
           >
             {exportingZip ? (
               <>
@@ -494,7 +536,9 @@ export default function DashboardPage() {
             type="button"
             className={styles.deployBtn}
             onClick={handleDeploy}
-            disabled={deploying}
+            disabled={deploying || !hasData}
+            title={hasData ? "Deploy live portfolio" : "Upload CV to deploy"}
+            style={{ opacity: hasData ? 1 : 0.6 }}
           >
             {deploying ? (
               <>
@@ -540,38 +584,59 @@ export default function DashboardPage() {
         {/* CV UPLOAD & LIVE LINK HERO BANNER */}
         <section className={styles.cvHeroBanner}>
           <div className={styles.cvHeroLeft}>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem", padding: "0.25rem 0.65rem", borderRadius: 999, background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)", color: "#a5b4fc", fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", marginBottom: "0.85rem" }}>
-              <span>📄</span> Active CV Source: {portfolio.cvFileName || "Resume Parsed"}
+            <div style={{ display: "inline-flex", alignItems: "center", gap: "0.45rem", padding: "0.25rem 0.65rem", borderRadius: 999, background: hasData ? "rgba(99,102,241,0.15)" : "rgba(148,163,184,0.12)", border: hasData ? "1px solid rgba(99,102,241,0.3)" : "1px solid rgba(148,163,184,0.2)", color: hasData ? "#a5b4fc" : "#94a3b8", fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", marginBottom: "0.85rem" }}>
+              <span>📄</span> {hasData ? `Active CV Source: ${portfolio.cvFileName || "Resume Parsed"}` : "Awaiting CV / Resume Upload"}
             </div>
 
             <h2>
-              Portfolio for <span className={styles.highlightText}>{portfolio.fullName}</span>
+              {hasData ? (
+                <>Portfolio for <span className={styles.highlightText}>{portfolio.fullName}</span></>
+              ) : (
+                <>Welcome, <span className={styles.highlightText}>{currentUser?.name || "Developer"}</span></>
+              )}
             </h2>
             <p className={styles.cvHeroDesc}>
-              Generated from your uploaded CV. Visitors can view your live case studies, work history, and you can export the full Next.js source code anytime.
+              {hasData
+                ? "Generated from your uploaded CV. Visitors can view your live case studies, work history, and you can export the full Next.js source code anytime."
+                : "Your workspace is clean and ready. Upload your resume or CV below to automatically parse your case studies, work history, and deploy your live portfolio."}
             </p>
 
             {/* Live Portfolio URL Box */}
             <div className={styles.liveLinkBox}>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
-                <span style={{ color: "#34d399", fontSize: "0.9rem" }}>🔗</span>
-                <span className={styles.liveUrlText}>
-                  {typeof window !== "undefined" ? window.location.origin : "https://portai.me"}/p/{portfolio.slug}
+                <span style={{ color: hasLiveSite ? "#34d399" : "#94a3b8", fontSize: "0.9rem" }}>🔗</span>
+                <span className={styles.liveUrlText} style={{ color: hasLiveSite ? undefined : "#94a3b8" }}>
+                  {hasLiveSite
+                    ? `${typeof window !== "undefined" ? window.location.origin : "https://portai.me"}/p/${portfolio.slug}`
+                    : `Live site will be provisioned at /p/${portfolio.slug || "my-portfolio"}`}
                 </span>
               </div>
-              <div className={styles.linkActions}>
-                <button type="button" className={styles.copyBtn} onClick={handleCopyLink}>
-                  Copy
-                </button>
-                <Link
-                  href={`/p/${portfolio.slug}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={styles.visitBtn}
+              {hasLiveSite ? (
+                <div className={styles.linkActions}>
+                  <button type="button" className={styles.copyBtn} onClick={handleCopyLink}>
+                    Copy
+                  </button>
+                  <Link
+                    href={`/p/${portfolio.slug}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={styles.visitBtn}
+                  >
+                    Visit Site ↗
+                  </Link>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.copyBtn}
+                  onClick={() => {
+                    const input = document.getElementById("cv-file-input");
+                    if (input) input.click();
+                  }}
                 >
-                  Visit Site ↗
-                </Link>
-              </div>
+                  Upload CV to Deploy
+                </button>
+              )}
             </div>
 
             <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
@@ -579,7 +644,9 @@ export default function DashboardPage() {
                 type="button"
                 className={styles.exportBtn}
                 onClick={handleExportZip}
-                disabled={exportingZip}
+                disabled={exportingZip || !hasData}
+                title={hasData ? "Download Next.js ZIP" : "Upload CV to enable export"}
+                style={{ opacity: hasData ? 1 : 0.6 }}
               >
                 📥 Download Next.js ZIP
               </button>
@@ -587,6 +654,8 @@ export default function DashboardPage() {
                 type="button"
                 className={styles.secondaryBtn}
                 onClick={handleOpenCodeInspector}
+                disabled={!hasData}
+                style={{ opacity: hasData ? 1 : 0.6 }}
               >
                 Inspect Source Code
               </button>
@@ -656,15 +725,15 @@ export default function DashboardPage() {
         {/* METRICS & READINESS GRID */}
         <section className={styles.statsGrid}>
           <div className={styles.scoreBannerCard}>
-            <div className={styles.scoreCircleLarge}>98%</div>
+            <div className={styles.scoreCircleLarge}>{hasData ? "98%" : "--"}</div>
             <div className={styles.scoreMeta}>
               <h3>ATS & Recruiter Readiness</h3>
               <p style={{ margin: 0, fontSize: "0.82rem", color: "#94a3b8" }}>
-                High-impact quantifiable stories extracted from CV
+                {hasData ? "High-impact quantifiable stories extracted from CV" : "Ready to evaluate upon CV upload"}
               </p>
               <div className={styles.scoreTags}>
-                <span className={styles.scoreChip}>ATS 99%</span>
-                <span className={styles.scoreChip}>SEO 100%</span>
+                <span className={styles.scoreChip}>{hasData ? "ATS 99%" : "ATS Ready"}</span>
+                <span className={styles.scoreChip}>{hasData ? "SEO 100%" : "SEO Ready"}</span>
                 <span className={styles.scoreChip}>Fast &lt;0.2s</span>
               </div>
             </div>
@@ -675,8 +744,8 @@ export default function DashboardPage() {
               <span>Profile Views</span>
               <span>📈</span>
             </div>
-            <div className={styles.statValue}>1,420</div>
-            <div className={styles.statGrowth}>+28% this week</div>
+            <div className={styles.statValue}>{hasData ? "1,420" : "0"}</div>
+            <div className={styles.statGrowth}>{hasData ? "+28% this week" : "Awaiting deployment"}</div>
           </div>
 
           <div className={styles.statCard}>
@@ -691,7 +760,7 @@ export default function DashboardPage() {
               </span>
             </div>
             <div className={styles.statGrowth} style={{ color: "#818cf8" }}>
-              Extracted from CV
+              {hasData ? "Extracted from CV" : "0 extracted"}
             </div>
           </div>
 
@@ -701,7 +770,7 @@ export default function DashboardPage() {
               <span>💻</span>
             </div>
             <div className={styles.statValue}>Next.js 16</div>
-            <div className={styles.statGrowth}>100% Exportable</div>
+            <div className={styles.statGrowth}>{hasData ? "100% Exportable" : "Ready on upload"}</div>
           </div>
         </section>
 
@@ -834,84 +903,137 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className={styles.projectsGrid}>
-              {filteredProjects.map((project) => (
-                <article key={project.id} className={styles.projectCard}>
-                  <div>
-                    <div className={styles.projectTop}>
-                      <h3 className={styles.projectTitle}>{project.title}</h3>
-                      <button
-                        type="button"
-                        className={`${styles.statusPill} ${project.isLive ? styles.statusLive : styles.statusDraft}`}
-                        onClick={() => toggleLive(project.id)}
-                        title="Click to toggle live status"
-                      >
-                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor" }} />
-                        {project.isLive ? "Live" : "Draft"}
-                      </button>
-                    </div>
-
-                    <p className={styles.projectDescription}>{project.description}</p>
-
-                    <div className={styles.projectTags}>
-                      {project.tags.map((tag, i) => (
-                        <span key={i} className={styles.tag}>
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className={styles.metricBadge}>
-                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#34d399" strokeWidth={2}>
-                        <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
-                        <polyline points="16 7 22 7 22 13"></polyline>
-                      </svg>
-                      <span>
-                        Key Impact: <strong>{project.metric}</strong>
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className={styles.projectActions}>
+            {filteredProjects.length === 0 ? (
+              <div style={{ padding: "3.5rem 1.5rem", textAlign: "center", background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.12)", borderRadius: "16px", marginTop: "1rem" }}>
+                <div style={{ width: 44, height: 44, borderRadius: "12px", background: "rgba(99,102,241,0.12)", color: "#818cf8", display: "grid", placeItems: "center", margin: "0 auto 1rem" }}>
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                    <line x1="8" y1="21" x2="16" y2="21" />
+                    <line x1="12" y1="17" x2="12" y2="21" />
+                  </svg>
+                </div>
+                <h4 style={{ fontSize: "1.05rem", fontWeight: 700, color: "#ffffff", margin: "0 0 0.35rem" }}>
+                  {portfolio.projects.length === 0 ? "No projects yet" : "No matching projects found"}
+                </h4>
+                <p style={{ fontSize: "0.85rem", color: "#94a3b8", maxWidth: 420, margin: "0 auto 1.25rem" }}>
+                  {portfolio.projects.length === 0
+                    ? "Upload your resume above to automatically synthesize case studies, or add your first project manually."
+                    : "Try adjusting your search query or category filter."}
+                </p>
+                {portfolio.projects.length === 0 && (
+                  <div style={{ display: "inline-flex", gap: "0.6rem" }}>
                     <button
                       type="button"
-                      className={styles.aiEnrichBtn}
-                      onClick={() => openAiEnrich(project)}
+                      className={styles.primaryBtn}
+                      onClick={() => {
+                        const input = document.getElementById("cv-file-input");
+                        if (input) input.click();
+                      }}
+                      style={{ padding: "0.45rem 0.95rem", fontSize: "0.82rem" }}
                     >
-                      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                        <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-                      </svg>
-                      AI Enrich Case Study
+                      📄 Upload Resume
                     </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryBtn}
+                      onClick={() => setAddModalOpen(true)}
+                      style={{ padding: "0.45rem 0.95rem", fontSize: "0.82rem" }}
+                    >
+                      + Add Project Manually
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className={styles.projectsGrid}>
+                {filteredProjects.map((project) => (
+                  <article key={project.id} className={styles.projectCard}>
+                    <div>
+                      <div className={styles.projectTop}>
+                        <h3 className={styles.projectTitle}>{project.title}</h3>
+                        <button
+                          type="button"
+                          className={`${styles.statusPill} ${project.isLive ? styles.statusLive : styles.statusDraft}`}
+                          onClick={() => toggleLive(project.id)}
+                          title="Click to toggle live status"
+                        >
+                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "currentColor" }} />
+                          {project.isLive ? "Live" : "Draft"}
+                        </button>
+                      </div>
 
-                    <div style={{ display: "flex", gap: "0.4rem" }}>
-                      <a
-                        href={project.repoUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={styles.actionIconBtn}
-                        title="View GitHub Repository"
-                      >
-                        <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
-                          <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                      <p className={styles.projectDescription}>{project.description}</p>
+
+                      <div className={styles.projectTags}>
+                        {project.tags.map((tag, i) => (
+                          <span key={i} className={styles.tag}>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+
+                      <div className={styles.metricBadge}>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#34d399" strokeWidth={2}>
+                          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
+                          <polyline points="16 7 22 7 22 13"></polyline>
                         </svg>
-                      </a>
+                        <span>
+                          Key Impact: <strong>{project.metric}</strong>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className={styles.projectActions}>
                       <button
                         type="button"
-                        className={styles.actionIconBtn}
-                        onClick={() => toggleLive(project.id)}
-                        title="Toggle Live/Draft"
+                        className={styles.aiEnrichBtn}
+                        onClick={() => openAiEnrich(project)}
                       >
-                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth={2}>
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                          <circle cx="12" cy="12" r="3"></circle>
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                          <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
                         </svg>
+                        AI Enrich Case Study
                       </button>
+
+                      <div style={{ display: "flex", gap: "0.4rem" }}>
+                        <a
+                          href={project.repoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={styles.actionIconBtn}
+                          title="View GitHub Repository"
+                        >
+                          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor">
+                            <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                          </svg>
+                        </a>
+                        <button
+                          type="button"
+                          className={styles.actionIconBtn}
+                          onClick={() => toggleLive(project.id)}
+                          title="Toggle Live/Draft"
+                        >
+                          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth={2}>
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.actionIconBtn}
+                          onClick={() => handleDeleteProject(project.id)}
+                          title="Remove project"
+                        >
+                          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth={2}>
+                            <path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                          </svg>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                </article>
-              ))}
-            </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -922,7 +1044,7 @@ export default function DashboardPage() {
               <div>
                 <h3 style={{ margin: "0 0 0.25rem" }}>Career History & Milestones</h3>
                 <p style={{ margin: 0, fontSize: "0.86rem", color: "#94a3b8" }}>
-                  Extracted and synthesized from {portfolio.cvFileName || "CV"}.
+                  {portfolio.cvFileName ? `Extracted and synthesized from ${portfolio.cvFileName}.` : "Add your career milestones manually or upload your CV."}
                 </p>
               </div>
               <button
@@ -934,31 +1056,47 @@ export default function DashboardPage() {
               </button>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-              {portfolio.experience.map((exp) => (
-                <div
-                  key={exp.id}
-                  style={{
-                    padding: "1.25rem",
-                    borderRadius: "12px",
-                    background: "rgba(255,255,255,0.03)",
-                    border: "1px solid var(--card-border)",
-                  }}
+            {portfolio.experience.length === 0 ? (
+              <div style={{ padding: "3rem 1.5rem", textAlign: "center", background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.12)", borderRadius: "12px" }}>
+                <p style={{ color: "#94a3b8", fontSize: "0.88rem", margin: "0 0 1rem" }}>
+                  No work experience or career history added yet.
+                </p>
+                <button
+                  type="button"
+                  className={styles.secondaryBtn}
+                  onClick={() => setAddExpModalOpen(true)}
+                  style={{ padding: "0.45rem 0.95rem", fontSize: "0.82rem" }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-                    <div style={{ fontWeight: 800, fontSize: "1rem", color: "#ffffff" }}>
-                      {exp.role} · <span style={{ color: "#818cf8" }}>{exp.company}</span>
+                  + Add Experience Manually
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                {portfolio.experience.map((exp) => (
+                  <div
+                    key={exp.id}
+                    style={{
+                      padding: "1.25rem",
+                      borderRadius: "12px",
+                      background: "rgba(255,255,255,0.03)",
+                      border: "1px solid var(--card-border)",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                      <div style={{ fontWeight: 800, fontSize: "1rem", color: "#ffffff" }}>
+                        {exp.role} · <span style={{ color: "#818cf8" }}>{exp.company}</span>
+                      </div>
+                      <span style={{ fontSize: "0.8rem", color: "#94a3b8" }}>{exp.period} · {exp.location}</span>
                     </div>
-                    <span style={{ fontSize: "0.8rem", color: "#94a3b8" }}>{exp.period} · {exp.location}</span>
+                    <ul style={{ margin: 0, paddingLeft: "1.2rem", fontSize: "0.88rem", color: "#cbd5e1", lineHeight: 1.6 }}>
+                      {exp.highlights.map((h, idx) => (
+                        <li key={idx}>{h}</li>
+                      ))}
+                    </ul>
                   </div>
-                  <ul style={{ margin: 0, paddingLeft: "1.2rem", fontSize: "0.88rem", color: "#cbd5e1", lineHeight: 1.6 }}>
-                    {exp.highlights.map((h, idx) => (
-                      <li key={idx}>{h}</li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

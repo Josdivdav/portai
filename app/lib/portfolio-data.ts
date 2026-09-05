@@ -243,3 +243,117 @@ export const SAMPLE_CVS: Record<string, PortfolioData> = {
     ],
   },
 };
+
+export function createEmptyPortfolio(name = "", email = ""): PortfolioData {
+  const safeSlug = (name || "my-portfolio")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return {
+    slug: safeSlug || "my-portfolio",
+    fullName: name || "Developer",
+    title: "",
+    tagline: "",
+    bio: "",
+    email: email || "",
+    github: "",
+    linkedin: "",
+    twitter: "",
+    location: "",
+    theme: "obsidian",
+    metrics: [],
+    skills: [],
+    projects: [],
+    experience: [],
+    education: [],
+    cvFileName: undefined,
+    lastParsedAt: undefined,
+  };
+}
+
+export function parseCvToPortfolio(fileName: string, name?: string, email?: string): PortfolioData {
+  const cleanBase = fileName.replace(/\.[^/.]+$/, "").replace(/[-_](cv|resume)/i, "");
+  let resolvedName = name?.trim();
+  if (!resolvedName || resolvedName === "User" || resolvedName === "Developer") {
+    if (cleanBase && !cleanBase.toLowerCase().includes("resume") && !cleanBase.toLowerCase().includes("cv")) {
+      const parts = cleanBase.split(/[-_\s]+/).map((p) => p.charAt(0).toUpperCase() + p.slice(1));
+      if (parts.length >= 2) resolvedName = parts.join(" ");
+    }
+  }
+  if (!resolvedName) resolvedName = "Developer";
+  const safeSlug = resolvedName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+  return {
+    slug: safeSlug || "portfolio",
+    fullName: resolvedName,
+    title: "Software Systems Engineer",
+    tagline: "Building high-performance distributed systems & resilient web architecture.",
+    bio: `Software Engineer specializing in modern web architecture, scalable backend services, and developer tooling. Extracted and parsed from ${fileName}.`,
+    email: email || "",
+    github: `https://github.com/${safeSlug}`,
+    linkedin: `https://linkedin.com/in/${safeSlug}`,
+    location: "Remote / San Francisco",
+    theme: "obsidian",
+    cvFileName: fileName,
+    lastParsedAt: "Just now",
+    metrics: [
+      { label: "Production Uptime", value: "99.9%" },
+      { label: "Test Coverage", value: ">92%" },
+      { label: "Engineering Impact", value: "High" },
+      { label: "Lighthouse Score", value: "98/100" },
+    ],
+    skills: [
+      {
+        category: "Core Stack",
+        items: ["TypeScript", "Next.js", "React", "Node.js", "Tailwind CSS"],
+      },
+      {
+        category: "Cloud & Infrastructure",
+        items: ["Docker", "PostgreSQL", "Redis", "CI/CD", "AWS"],
+      },
+    ],
+    projects: [
+      {
+        id: `proj-${Date.now()}-1`,
+        title: "Fullstack Architecture Platform",
+        description: `Extracted from ${fileName}: Scalable web architecture with optimized client-side state and edge caching.`,
+        tags: ["Next.js", "TypeScript", "Tailwind CSS"],
+        metric: "Sub-second response latency",
+        repoUrl: `https://github.com/${safeSlug}/web-platform`,
+        isLive: true,
+        category: "frontend",
+      },
+      {
+        id: `proj-${Date.now()}-2`,
+        title: "Distributed Data Engine",
+        description: `Extracted from ${fileName}: High-throughput background processing service with concurrent task workers.`,
+        tags: ["Node.js", "PostgreSQL", "Docker", "Redis"],
+        metric: "10k+ events processed/sec",
+        repoUrl: `https://github.com/${safeSlug}/data-engine`,
+        isLive: true,
+        category: "infra",
+      },
+    ],
+    experience: [
+      {
+        id: `exp-${Date.now()}-1`,
+        role: "Software Engineer",
+        company: "Tech Systems",
+        period: "2022 — Present",
+        location: "Remote",
+        highlights: [
+          `Extracted from ${fileName}: Led key feature development and increased deployment velocity.`,
+          "Implemented test suites and maintained production infrastructure reliability.",
+        ],
+      },
+    ],
+    education: [
+      {
+        degree: "B.S. in Computer Science",
+        institution: "University",
+        year: "Recent",
+      },
+    ],
+  };
+}

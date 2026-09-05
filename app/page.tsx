@@ -1,15 +1,17 @@
 'use client';
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
+
+const emptySubscribe = () => () => {};
 
 export default function Home() {
-  const [domain, setDomain] = useState<string>("");
-
-  useEffect(() => {
-    const d = window.location.hostname;
-    setDomain(`${d}/p/your-name`);
-  }, []);
+  const hostname = useSyncExternalStore(
+    emptySubscribe,
+    () => (typeof window !== "undefined" ? window.location.hostname : ""),
+    () => ""
+  );
+  const domain = hostname ? `${hostname}/p/your-name` : "portai.me/p/your-name";
 
   return (
     <div className="flex flex-col min-h-screen bg-[#07090e] text-slate-100 font-sans selection:bg-indigo-500 selection:text-white relative overflow-hidden">

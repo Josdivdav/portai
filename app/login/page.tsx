@@ -1,9 +1,16 @@
 "use client";
 
-import { useState, useTransition, Suspense, type FormEvent } from "react";
+import { useState, useEffect, useTransition, Suspense, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import styles from "./login.module.css";
+import {
+  loginWithEmail,
+  loginWithGoogle,
+  loginWithGithub,
+  requestPasswordReset,
+  formatLoginError,
+} from "../functions/login.function";
 
 function LoginForm() {
   const router = useRouter();
@@ -22,6 +29,26 @@ function LoginForm() {
   const [successMessage, setSuccessMessage] = useState<string | null>(
     registered ? "Account created successfully! Please sign in with your credentials." : null
   );
+
+  // Check if session is already active on load
+  useEffect(() => {
+    let isMounted = true;
+    async function checkExistingSession() {
+      try {
+        const res = await fetch("/api/auth/me");
+        const data = await res.json().catch(() => ({}));
+        if (data?.authenticated && isMounted) {
+          router.replace(next || "/dashboard");
+        }
+      } catch {
+        // Continue showing login page
+      }
+    }
+    checkExistingSession();
+    return () => {
+      isMounted = false;
+    };
+  }, [next, router]);
 
   // Forgot password modal state
   const [forgotModalOpen, setForgotModalOpen] = useState(false);
@@ -59,22 +86,11 @@ function LoginForm() {
     setSubmitting(true);
 
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: trimmedEmail,
-          password,
-          remember,
-        }),
+      await loginWithEmail({
+        email: trimmedEmail,
+        password,
+        remember,
       });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        setError(data.error || "Unable to sign in. Please verify your credentials.");
-        return;
-      }
 
       setSuccessMessage("Sign in verified! Launching your workspace…");
 
@@ -82,8 +98,8 @@ function LoginForm() {
         router.push(next || "/dashboard");
         router.refresh();
       });
-    } catch {
-      setError("Unable to connect to authentication servers. Please check your network.");
+    } catch (err: unknown) {
+      setError(formatLoginError(err));
     } finally {
       setSubmitting(false);
     }
@@ -95,32 +111,20 @@ function LoginForm() {
     setSuccessMessage(null);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      const providerEmail =
-        provider === "github" ? "github.dev@portai.me" : "google.user@portai.dev";
-
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: providerEmail,
-          password: "oauth_social_verified_session",
-          remember: true,
-        }),
-      });
-
-      if (res.ok) {
-        setSuccessMessage(`${provider === "github" ? "GitHub" : "Google"} connected! Redirecting…`);
-        startTransition(() => {
-          router.push(next || "/dashboard");
-          router.refresh();
-        });
-      } else {
-        setError(`${provider === "github" ? "GitHub" : "Google"} authentication failed. Please try again.`);
+      if (provider === "google") {
+        await loginWithGoogle(remember);
+        setSuccessMessage("Google account connected! Launching workspace…");
+      } else if (provider === "github") {
+        await loginWithGithub(remember);
+        setSuccessMessage("GitHub account connected! Launching workspace…");
       }
-    } catch {
-      setError("An unexpected error occurred during social sign in.");
+
+      startTransition(() => {
+        router.push(next || "/dashboard");
+        router.refresh();
+      });
+    } catch (err: unknown) {
+      setError(formatLoginError(err));
     } finally {
       setSocialLoading(null);
     }
@@ -146,21 +150,10 @@ function LoginForm() {
     setForgotLoading(true);
 
     try {
-      const res = await fetch("/api/auth/forgot-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmed }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (res.ok) {
-        setForgotSuccess(data.message || `Password reset link has been dispatched to ${trimmed}.`);
-      } else {
-        setForgotError(data.error || "Unable to send reset email. Please try again.");
-      }
-    } catch {
-      setForgotError("Unable to reach the server. Please check your connection.");
+      const msg = await requestPasswordReset(trimmed);
+      setForgotSuccess(msg);
+    } catch (err: unknown) {
+      setForgotError(formatLoginError(err));
     } finally {
       setForgotLoading(false);
     }

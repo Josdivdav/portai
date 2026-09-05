@@ -14,10 +14,15 @@ export default function PublicPortfolioPage({
   const resolvedParams = use(params);
   const slug = resolvedParams.slug;
 
-  const [data, setData] = useState<PortfolioData>(() => {
+  const [data, setData] = useState<PortfolioData | null>(() => {
     if (slug === "jordan-lee") return SAMPLE_CVS.fullstack;
-    return DEFAULT_PORTFOLIO;
+    if (slug === "alex-rivera") return DEFAULT_PORTFOLIO;
+    return null;
   });
+  const [loading, setLoading] = useState<boolean>(() => {
+    return slug !== "jordan-lee" && slug !== "alex-rivera";
+  });
+  const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -28,10 +33,16 @@ export default function PublicPortfolioPage({
           const json = await res.json();
           if (json.portfolio && isMounted) {
             setData(json.portfolio);
+            setNotFound(false);
           }
+        } else if (res.status === 404) {
+          if (isMounted) setNotFound(true);
         }
       } catch (err) {
         console.warn("Could not load published portfolio:", err);
+        if (isMounted) setNotFound(true);
+      } finally {
+        if (isMounted) setLoading(false);
       }
     }
     loadPortfolio();
@@ -68,6 +79,47 @@ export default function PublicPortfolioPage({
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: "100svh", display: "grid", placeItems: "center", background: "#07090e" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+          <div style={{ width: 34, height: 34, borderRadius: "50%", border: "3px solid #6366f1", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />
+          <span style={{ color: "#94a3b8", fontSize: "0.88rem" }}>Loading portfolio…</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (notFound || !data) {
+    return (
+      <div style={{ minHeight: "100svh", display: "grid", placeItems: "center", background: "#07090e", color: "#f8fafc", padding: "2rem", textAlign: "center", fontFamily: "sans-serif" }}>
+        <div style={{ maxWidth: 460, width: "100%", padding: "2.5rem 2rem", borderRadius: "16px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.1)", boxShadow: "0 20px 40px rgba(0,0,0,0.5)" }}>
+          <div style={{ width: 50, height: 50, borderRadius: "12px", background: "rgba(99,102,241,0.15)", color: "#818cf8", display: "grid", placeItems: "center", margin: "0 auto 1.25rem", fontSize: "1.4rem" }}>
+            🌐
+          </div>
+          <h2 style={{ fontSize: "1.35rem", fontWeight: 800, margin: "0 0 0.6rem", color: "#ffffff" }}>Portfolio Not Published Yet</h2>
+          <p style={{ color: "#94a3b8", fontSize: "0.9rem", lineHeight: 1.6, margin: "0 0 1.75rem" }}>
+            The portfolio at <code style={{ color: "#a5b4fc", background: "rgba(99,102,241,0.12)", padding: "0.2rem 0.45rem", borderRadius: 6 }}>/p/{slug}</code> has not been deployed yet.
+          </p>
+          <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center" }}>
+            <Link
+              href="/dashboard"
+              style={{ padding: "0.6rem 1.25rem", borderRadius: "10px", background: "#6366f1", color: "#ffffff", fontWeight: 700, textDecoration: "none", fontSize: "0.88rem" }}
+            >
+              Open Dashboard
+            </Link>
+            <Link
+              href="/"
+              style={{ padding: "0.6rem 1.25rem", borderRadius: "10px", background: "rgba(255,255,255,0.08)", color: "#ffffff", fontWeight: 600, textDecoration: "none", fontSize: "0.88rem" }}
+            >
+              Home
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

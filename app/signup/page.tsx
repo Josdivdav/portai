@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, Suspense, type FormEvent } from "react";
+import { useState, useEffect, useMemo, Suspense, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import styles from "../login/login.module.css";
@@ -27,6 +27,26 @@ function RegisterForm() {
   const [socialLoading, setSocialLoading] = useState<"google" | "github" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Check if session is already active on load
+  useEffect(() => {
+    let isMounted = true;
+    async function checkExistingSession() {
+      try {
+        const res = await fetch("/api/auth/me");
+        const data = await res.json().catch(() => ({}));
+        if (data?.authenticated && isMounted) {
+          router.replace(next || "/dashboard");
+        }
+      } catch {
+        // Continue showing signup page
+      }
+    }
+    checkExistingSession();
+    return () => {
+      isMounted = false;
+    };
+  }, [next, router]);
 
   const strengthInfo = useMemo(() => {
     if (!password1) return { score: 0, label: "Empty", color: "#64748b" };
